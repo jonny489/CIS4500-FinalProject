@@ -5,7 +5,7 @@ from psycopg2.extensions import connection
 router = APIRouter()
 
 
-@router.get("/api/recipes/{recipe_id}")
+@router.get("/api/recipes/{recipe_id:int}")
 def get_recipe_details(recipe_id: int, db: connection = Depends(get_db)):
     cursor = db.cursor()
     try:
