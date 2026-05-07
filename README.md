@@ -9,4 +9,4 @@ Create .env file and throw in environment variables/database info into .env file
 Using psycopg2 with standard SQL no ORM
 
 
-Next.JS frontend
+Next.JS frontend, Auth with NextAuth
