@@ -4,6 +4,8 @@ from routes.ingredients_for_recipe import router as ingredients_for_recipe_route
 from routes.recipe_details import router as recipe_details_router
 from routes.num_ingredients_recipe import router as num_ingredients_recipe_router
 from routes.recipes_with_ingredient_ner import router as recipes_with_ingredient_ner_router
+from routes.recipes_by_excluded_ingredients import router as recipes_by_excluded_ingredients_router
+from routes.walmart_search import router as walmart_search_router
 app = FastAPI()
 
 
@@ -21,3 +23,5 @@ app.include_router(ingredients_for_recipe_router)
 app.include_router(recipe_details_router)
 app.include_router(num_ingredients_recipe_router)
 app.include_router(recipes_with_ingredient_ner_router)
+app.include_router(recipes_by_excluded_ingredients_router)
+app.include_router(walmart_search_router)
