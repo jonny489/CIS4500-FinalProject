@@ -19,6 +19,8 @@ interface Ingredient {
   ner_label: string;
 }
 
+const FRIDGE_SEARCH_CACHE_KEY = "fridgeSearchCache";
+
 export default function RecipeDetailsPage({
   params,
 }: {
@@ -29,6 +31,12 @@ export default function RecipeDetailsPage({
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasFromFridgeSearch, setHasFromFridgeSearch] = useState(false);
+
+  useEffect(() => {
+    const cached = sessionStorage.getItem(FRIDGE_SEARCH_CACHE_KEY);
+    setHasFromFridgeSearch(!!cached);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -70,12 +78,22 @@ export default function RecipeDetailsPage({
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <div className="max-w-3xl mx-auto px-6 py-16">
-        <Link
-          href="/"
-          className="text-blue-500 hover:underline text-sm mb-6 inline-block"
-        >
-          &larr; Back to search
-        </Link>
+        <div className="flex gap-4 mb-6">
+          <Link
+            href="/"
+            className="text-blue-500 hover:underline text-sm"
+          >
+            &larr; Back to search
+          </Link>
+          {hasFromFridgeSearch && (
+            <Link
+              href="/fridgesearch"
+              className="text-blue-500 hover:underline text-sm"
+            >
+              &larr; Back to Fridge Search
+            </Link>
+          )}
+        </div>
 
         <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
           {recipe.name}
