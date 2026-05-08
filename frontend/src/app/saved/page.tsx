@@ -75,18 +75,16 @@ export default function SavedRecipesPage() {
           <ul className="space-y-3">
             {recipes.map((recipe) => (
               <li key={recipe.recipe_id}>
-                <Link
-                  href={`/recipes/${recipe.recipe_id}`}
-                  className="block p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
-                >
-                  <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
-                    {recipe.name}
-                  </h2>
+                <div className="block p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors">
+                  <Link href={`/recipes/${recipe.recipe_id}`}>
+                    <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50 hover:text-blue-500 transition-colors">
+                      {recipe.name}
+                    </h2>
+                  </Link>
                   <a
                     href={formatRecipeLink(recipe.link)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
                     className="text-sm text-blue-500 hover:underline mt-1 inline-block"
                   >
                     {recipe.link.replace(/^www\./, "")}
@@ -94,7 +92,7 @@ export default function SavedRecipesPage() {
                   <p className="text-sm text-zinc-500 mt-1">
                     Saved {new Date(recipe.saved_at).toLocaleDateString()}
                   </p>
-                </Link>
+                </div>
               </li>
             ))}
           </ul>
