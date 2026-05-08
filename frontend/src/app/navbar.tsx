@@ -25,6 +25,12 @@ export default function Navbar() {
           >
             Budget Finder
           </Link>
+          <Link
+            href="/numingredients"
+            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+          >
+            By Ingredient Count
+          </Link>
           {session?.user && (
             <Link
               href="/saved"
