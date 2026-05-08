@@ -12,6 +12,7 @@ from routes.recipe_estimated_cost import router as recipe_estimated_cost_router
 from routes.recipe_ingredient_matches import router as recipe_ingredient_matches_router
 from routes.user_saved_recipes import router as user_saved_recipes_router
 from routes.auth import router as auth_router
+from routes.recipes_filter import router as recipes_filter_router
 app = FastAPI()
 
 app.add_middleware(
@@ -43,3 +44,4 @@ app.include_router(recipe_estimated_cost_router)
 app.include_router(recipe_ingredient_matches_router)
 app.include_router(user_saved_recipes_router)
 app.include_router(auth_router)
+app.include_router(recipes_filter_router)
