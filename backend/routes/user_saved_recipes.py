@@ -75,6 +75,35 @@ def get_saved_recipe(
         cursor.close()
 
 
+@router.delete("/api/users/{user_id}/saved-recipes/{recipe_id}", status_code=200)
+def unsave_recipe(
+    user_id: str,
+    recipe_id: int,
+    db: connection = Depends(get_db),
+):
+    cursor = db.cursor()
+    try:
+        cursor.execute(
+            """
+            DELETE FROM user_saved_recipe
+            WHERE user_id = %s AND recipe_id = %s
+            RETURNING user_id, recipe_id
+            """,
+            (user_id, recipe_id),
+        )
+        row = cursor.fetchone()
+        db.commit()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Saved recipe not found")
+        return {
+            "user_id": row[0],
+            "recipe_id": row[1],
+            "saved": False,
+        }
+    finally:
+        cursor.close()
+
+
 @router.get("/api/users/{user_id}/saved-recipes")
 def list_saved_recipes(
     user_id: str,
