@@ -3,6 +3,19 @@
 import { useEffect, useState, use } from "react";
 import { useSession } from "next-auth/react";
 import { apiFetch, apiPost, apiDelete, formatRecipeLink } from "@/lib/api";
+
+interface CostEstimate {
+  estimated_total: number;
+  currency: string;
+  missing_prices: number;
+}
+
+interface IngredientMatch {
+  ingredient_id: number;
+  walmart_name: string | null;
+  price: number | null;
+  walmart_link: string | null;
+}
 import Link from "next/link";
 
 interface Recipe {
@@ -41,16 +54,24 @@ export default function RecipeDetailsPage({
   }, []);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cost, setCost] = useState<CostEstimate | null>(null);
+  const [matchMap, setMatchMap] = useState<Map<number, IngredientMatch>>(new Map());
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [recipeData, ingredientData] = await Promise.all([
+        const [recipeData, ingredientData, costData, matchData] = await Promise.all([
           apiFetch<Recipe>(`/recipes/${id}`),
           apiFetch<{ ingredients: Ingredient[] }>(`/recipes/${id}/ingredients`),
+          apiFetch<CostEstimate>(`/recipes/${id}/estimated-cost`),
+          apiFetch<{ matches: (IngredientMatch & { ingredient_id: number })[] }>(`/recipes/${id}/ingredient-matches`),
         ]);
         setRecipe(recipeData);
         setIngredients(ingredientData.ingredients);
+        setCost(costData);
+        const map = new Map<number, IngredientMatch>();
+        for (const m of matchData.matches) map.set(m.ingredient_id, m);
+        setMatchMap(map);
 
         if (session?.user?.id) {
           try {
@@ -141,6 +162,18 @@ export default function RecipeDetailsPage({
             >
               View original source
             </a>
+            {cost && cost.estimated_total > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                  Estimated cost: ${cost.estimated_total.toFixed(2)} {cost.currency}
+                </span>
+                {cost.missing_prices > 0 && (
+                  <span className="text-xs text-zinc-400">
+                    ({cost.missing_prices} ingredient{cost.missing_prices !== 1 ? "s" : ""} without price data)
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {session?.user && (
             <button
@@ -163,19 +196,37 @@ export default function RecipeDetailsPage({
           </h2>
           {ingredients.length > 0 ? (
             <ul className="space-y-2">
-              {ingredients.map((ing) => (
-                <li
-                  key={ing.ingredient_id}
-                  className="flex justify-between items-center p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800"
-                >
-                  <span className="text-zinc-900 dark:text-zinc-50">
-                    {ing.ingredient_description}
-                  </span>
-                  <span className="text-sm text-zinc-500">
-                    {ing.quantity} {ing.units}
-                  </span>
-                </li>
-              ))}
+              {ingredients.map((ing) => {
+                const match = matchMap.get(ing.ingredient_id);
+                return (
+                  <li
+                    key={ing.ingredient_id}
+                    className="flex justify-between items-center p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800"
+                  >
+                    <span className="text-zinc-900 dark:text-zinc-50">
+                      {ing.ingredient_description}
+                      <span className="ml-2 text-sm text-zinc-500">
+                        {ing.quantity} {ing.units}
+                      </span>
+                    </span>
+                    {match?.walmart_name && match.price != null ? (
+                      <a
+                        href={match.walmart_link ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 ml-4 flex items-center gap-2 hover:underline"
+                      >
+                        <span className="text-xs text-zinc-400 max-w-[160px] truncate">
+                          {match.walmart_name}
+                        </span>
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                          ${match.price.toFixed(2)}
+                        </span>
+                      </a>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-zinc-500">No ingredients listed.</p>
