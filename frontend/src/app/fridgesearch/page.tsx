@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { formatRecipeLink } from "@/lib/api";
 import Link from "next/link";
 
 interface Recipe {
@@ -266,6 +267,29 @@ export default function FridgeSearch() {
               </button>
             </div>
           </div>
+          <ul className="space-y-3">
+            {recipes.map((recipe) => (
+              <li key={recipe.recipe_id}>
+                <Link
+                  href={`/recipes/${recipe.recipe_id}`}
+                  className="block p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
+                >
+                  <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+                    {recipe.name}
+                  </h2>
+                  <a
+                    href={formatRecipeLink(recipe.link)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm text-blue-500 hover:underline mt-1 inline-block"
+                  >
+                    {recipe.link.replace(/^www\./, "")}
+                  </a>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

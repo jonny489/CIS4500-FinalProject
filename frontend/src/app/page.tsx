@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, formatRecipeLink } from "@/lib/api";
 import Link from "next/link";
 
 interface Recipe {
@@ -83,7 +83,15 @@ export default function Home() {
                   <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
                     {recipe.name}
                   </h2>
-                  <p className="text-sm text-zinc-500 mt-1">{recipe.link}</p>
+                  <a
+                    href={formatRecipeLink(recipe.link)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm text-blue-500 hover:underline mt-1 inline-block"
+                  >
+                    {recipe.link.replace(/^www\./, "")}
+                  </a>
                 </Link>
               </li>
             ))}
