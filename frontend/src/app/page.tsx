@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatRecipeLink } from "@/lib/api";
 import Link from "next/link";
+
+const SEARCH_CACHE_KEY = "recipeSearchCache";
 
 interface Recipe {
   recipe_id: number;
@@ -98,6 +100,31 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
+  // Restore state from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(SEARCH_CACHE_KEY);
+      if (!cached) return;
+      const s = JSON.parse(cached);
+      setQuery(s.query ?? "");
+      setIncludeNers(s.includeNers ?? []);
+      setExcludeNers(s.excludeNers ?? []);
+      setMaxBudget(s.maxBudget ?? "");
+      setMinIngredients(s.minIngredients ?? "");
+      setMaxIngredients(s.maxIngredients ?? "");
+      setSort(s.sort ?? "name");
+      setRecipes(s.recipes ?? []);
+      setCurrentPage(s.currentPage ?? 1);
+      setHasMore(s.hasMore ?? false);
+      setSearched(s.searched ?? false);
+      if (s.includeNers?.length > 0 || s.excludeNers?.length > 0 || s.maxBudget || s.minIngredients || s.maxIngredients || s.sort !== "name") {
+        setShowFilters(true);
+      }
+    } catch {
+      sessionStorage.removeItem(SEARCH_CACHE_KEY);
+    }
+  }, []);
+
   const activeFilterCount = [
     includeNers.length > 0,
     excludeNers.length > 0,
@@ -129,7 +156,13 @@ export default function Home() {
       const data: { recipes: Recipe[]; pagination: Pagination } = await res.json();
       setRecipes(data.recipes);
       setCurrentPage(page);
-      setHasMore(data.pagination.returned === PAGE_SIZE);
+      const more = data.pagination.returned === PAGE_SIZE;
+      setHasMore(more);
+      sessionStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify({
+        query, includeNers: include, excludeNers: exclude,
+        maxBudget, minIngredients, maxIngredients, sort,
+        recipes: data.recipes, currentPage: page, hasMore: more, searched: true,
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -306,6 +339,7 @@ export default function Home() {
                     setMinIngredients("");
                     setMaxIngredients("");
                     setSort("name");
+                    sessionStorage.removeItem(SEARCH_CACHE_KEY);
                   }}
                   className="text-sm text-zinc-500 hover:text-red-500 transition-colors text-left"
                 >

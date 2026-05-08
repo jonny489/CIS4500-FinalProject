@@ -13,30 +13,6 @@ export default function Navbar() {
           <Link href="/" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             Recipe Search
           </Link>
-          <Link
-            href="/fridgesearch"
-            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-          >
-            Fridge Search
-          </Link>
-          <Link
-            href="/budget"
-            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-          >
-            Budget Finder
-          </Link>
-          <Link
-            href="/numingredients"
-            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-          >
-            By Ingredient Count
-          </Link>
-          <Link
-            href="/excluded"
-            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
-          >
-            Exclude Ingredients
-          </Link>
           {session?.user && (
             <Link
               href="/saved"

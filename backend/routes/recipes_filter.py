@@ -56,15 +56,17 @@ def filter_recipes(
         params.append(max_ingredients)
 
     if normalized_exclude:
+        # Use LIKE patterns so "vanilla" also excludes "vanilla extract", "vanilla flavoring" etc.
+        exclude_patterns = [f"%{term}%" for term in normalized_exclude]
         conditions.append(
             "NOT EXISTS ("
             " SELECT 1 FROM needed_for nf_ex"
             " JOIN ingredients i_ex ON i_ex.ingredient_id = nf_ex.ingredient_id"
             " WHERE nf_ex.recipe_id = r.recipe_id"
-            " AND LOWER(i_ex.ner_label) = ANY(%s::text[])"
+            " AND LOWER(i_ex.ner_label) LIKE ANY(%s::text[])"
             ")"
         )
-        params.append(normalized_exclude)
+        params.append(exclude_patterns)
 
     sql = f"SELECT {select_cols} FROM recipes r"
     sql += " " + " ".join(joins)
