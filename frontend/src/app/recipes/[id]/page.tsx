@@ -35,8 +35,6 @@ interface Ingredient {
   ner_label: string;
 }
 
-const FRIDGE_SEARCH_CACHE_KEY = "fridgeSearchCache";
-
 export default function RecipeDetailsPage({
   params,
 }: {
@@ -48,12 +46,6 @@ export default function RecipeDetailsPage({
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasFromFridgeSearch, setHasFromFridgeSearch] = useState(false);
-
-  useEffect(() => {
-    const cached = sessionStorage.getItem(FRIDGE_SEARCH_CACHE_KEY);
-    setHasFromFridgeSearch(!!cached);
-  }, []);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const lastSaveTime = useRef<number>(0);
@@ -149,14 +141,6 @@ export default function RecipeDetailsPage({
           >
             &larr; Back to search
           </Link>
-          {hasFromFridgeSearch && (
-            <Link
-              href="/fridgesearch"
-              className="text-blue-500 hover:underline text-sm"
-            >
-              &larr; Back to Fridge Search
-            </Link>
-          )}
         </div>
 
         <div className="flex items-start justify-between gap-4">
