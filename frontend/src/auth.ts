@@ -39,7 +39,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google" || account?.provider === "github") {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/oauth`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/oauth`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -48,6 +48,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             auth_provider: account.provider,
           }),
         });
+        if (res.ok) {
+          const data = await res.json();
+          user.id = data.user_id;
+        }
       }
       return true;
     },
