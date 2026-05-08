@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { apiFetch, apiPost, apiDelete, formatRecipeLink } from "@/lib/api";
 import Link from "next/link";
+
+const SAVE_DEBOUNCE_MS = 1000;
 
 interface Recipe {
   recipe_id: number;
@@ -41,6 +43,7 @@ export default function RecipeDetailsPage({
   }, []);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const lastSaveTime = useRef<number>(0);
 
   useEffect(() => {
     async function fetchData() {
@@ -69,8 +72,15 @@ export default function RecipeDetailsPage({
     fetchData();
   }, [id, session?.user?.id]);
 
-  async function handleToggleSave() {
+  const handleToggleSave = useCallback(async () => {
     if (!session?.user?.id) return;
+    
+    const now = Date.now();
+    if (now - lastSaveTime.current < SAVE_DEBOUNCE_MS) {
+      return;
+    }
+    lastSaveTime.current = now;
+    
     setSaving(true);
     try {
       if (saved) {
@@ -87,7 +97,7 @@ export default function RecipeDetailsPage({
     } finally {
       setSaving(false);
     }
-  }
+  }, [session?.user?.id, saved, id]);
 
   if (loading) {
     return (
