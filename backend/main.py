@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes.recipes_by_name import router as recipes_by_name_router
 from routes.ingredients_for_recipe import router as ingredients_for_recipe_router
 from routes.recipe_details import router as recipe_details_router
@@ -10,7 +11,15 @@ from routes.recipes_by_budget import router as recipes_by_budget_router
 from routes.recipe_estimated_cost import router as recipe_estimated_cost_router
 from routes.recipe_ingredient_matches import router as recipe_ingredient_matches_router
 from routes.user_saved_recipes import router as user_saved_recipes_router
+from routes.auth import router as auth_router
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -33,3 +42,4 @@ app.include_router(recipes_by_budget_router)
 app.include_router(recipe_estimated_cost_router)
 app.include_router(recipe_ingredient_matches_router)
 app.include_router(user_saved_recipes_router)
+app.include_router(auth_router)
