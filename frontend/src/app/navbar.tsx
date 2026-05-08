@@ -9,9 +9,17 @@ export default function Navbar() {
   return (
     <nav className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
       <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Recipe Search
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Recipe Search
+          </Link>
+          <Link
+            href="/fridgesearch"
+            className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+          >
+            Fridge Search
+          </Link>
+        </div>
         <div className="flex items-center gap-4">
           {session?.user ? (
             <>
