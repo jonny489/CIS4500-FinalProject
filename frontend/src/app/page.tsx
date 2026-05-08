@@ -75,24 +75,23 @@ export default function Home() {
         {recipes.length > 0 && (
           <ul className="space-y-3">
             {recipes.map((recipe) => (
-              <li key={recipe.recipe_id}>
-                <Link
-                  href={`/recipes/${recipe.recipe_id}`}
-                  className="block p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
-                >
-                  <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+              <li
+                key={recipe.recipe_id}
+                className="p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors"
+              >
+                <Link href={`/recipes/${recipe.recipe_id}`}>
+                  <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-50 hover:text-blue-500 transition-colors">
                     {recipe.name}
                   </h2>
-                  <a
-                    href={formatRecipeLink(recipe.link)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-sm text-blue-500 hover:underline mt-1 inline-block"
-                  >
-                    {recipe.link.replace(/^www\./, "")}
-                  </a>
                 </Link>
+                <a
+                  href={formatRecipeLink(recipe.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-500 hover:underline mt-1 inline-block"
+                >
+                  {recipe.link.replace(/^www\./, "")}
+                </a>
               </li>
             ))}
           </ul>
