@@ -5,6 +5,21 @@ export function formatRecipeLink(link: string): string {
   return cleaned.startsWith("http") ? cleaned : `https://${cleaned}`;
 }
 
+/**
+ * Links rendered as <a href> come from imported CSV data we don't control.
+ * Only pass through http(s) URLs so a poisoned row can't inject a
+ * `javascript:` or `data:` link; anything else renders as plain text.
+ */
+export function safeExternalUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:" ? url : null;
+  } catch {
+    return null; // Not an absolute URL, so not something we should link to.
+  }
+}
+
 export async function apiFetch<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   if (params) {
