@@ -1,32 +1,26 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { apiDelete, apiFetch } from "@/lib/api";
 import { ErrorPanel, SkeletonGrid, Toast } from "@/components/ui";
-import { money, SAVED_RECIPES_PARAMS } from "@/lib/search";
+import { listSavedRecipes, unsaveRecipe } from "@/lib/saved-recipes";
+import { money } from "@/lib/search";
 import { useFetch } from "@/lib/use-fetch";
 
-interface SavedRecipe { recipe_id: number; name: string; link: string; saved_at: string; estimated_total?: number }
-
 export default function SavedRecipesPage() {
-  const { data: session, status } = useSession();
-  const userId = session?.user?.id;
+  const { status } = useSession();
   const [toast, setToast] = useState<string | null>(null);
   // Optimistically hidden cards. Kept separate from the fetched list so a failed
   // delete can roll back by un-hiding one id without refetching.
   const [removed, setRemoved] = useState<Set<number>>(new Set());
 
-  // null until the session resolves to a user, so we never fetch for "undefined".
-  // The API already orders by saved_at DESC.
-  const fetchSaved = useCallback(
-    () => apiFetch<{ saved_recipes: SavedRecipe[] }>(`/users/${userId}/saved-recipes`, SAVED_RECIPES_PARAMS),
-    [userId]
-  );
-  const { data, error, loading, reload } = useFetch(userId ? fetchSaved : null);
-  const recipes = (data?.saved_recipes ?? []).filter((r) => !removed.has(r.recipe_id));
+  // null until the session is confirmed, so we don't fetch while signed out.
+  // listSavedRecipes is a module-level function, so its identity is stable for
+  // useFetch. The API already orders by saved_at DESC.
+  const { data, error, loading, reload } = useFetch(status === "authenticated" ? listSavedRecipes : null);
+  const recipes = (data ?? []).filter((r) => !removed.has(r.recipe_id));
 
   // After all hooks so hook order is identical on every render; redirect() throws.
   if (status === "unauthenticated") redirect("/login?reason=saved&callbackUrl=/saved");
@@ -42,7 +36,7 @@ export default function SavedRecipesPage() {
   async function remove(id: number) {
     setHidden(id, true);
     try {
-      await apiDelete(`/users/${userId}/saved-recipes/${id}`);
+      await unsaveRecipe(id);
       setToast("Removed from saved");
     } catch {
       setHidden(id, false);

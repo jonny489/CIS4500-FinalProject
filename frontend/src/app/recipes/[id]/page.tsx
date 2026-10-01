@@ -3,8 +3,9 @@
 import { Suspense, use, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { apiDelete, apiFetch, apiPost, formatRecipeLink, safeExternalUrl } from "@/lib/api";
+import { apiFetch, formatRecipeLink, safeExternalUrl } from "@/lib/api";
 import { ErrorPanel, Toast } from "@/components/ui";
+import { isRecipeSaved, saveRecipe, unsaveRecipe } from "@/lib/saved-recipes";
 import { money, sourceOf } from "@/lib/search";
 import { useFetch } from "@/lib/use-fetch";
 
@@ -39,8 +40,8 @@ export default function RecipeDetailsPage({ params }: { params: Promise<{ id: st
 
 function RecipeDetails({ id }: { id: string }) {
   const router = useRouter();
-  const { data: session } = useSession();
-  const userId = session?.user?.id;
+  const { status } = useSession();
+  const signedIn = status === "authenticated";
   // Ingredients the user said they have, carried from the result card via ?have=…
   // Lowercased to match the backend, which compares LOWER(ner_label).
   const have = useSearchParams().getAll("have").map((h) => h.toLowerCase());
@@ -52,17 +53,20 @@ function RecipeDetails({ id }: { id: string }) {
   const { data, error, loading, reload } = useFetch(fetchBundle);
 
   useEffect(() => {
-    if (!userId) return;
-    apiFetch(`/users/${userId}/saved-recipes/${id}`).then(() => setSaved(true)).catch(() => setSaved(false));
-  }, [userId, id]);
+    if (!signedIn) return;
+    isRecipeSaved(Number(id))
+      .then(setSaved)
+      // Non-fatal: the button just starts as "Save". Log it so it isn't silent.
+      .catch((e) => console.error("Failed to check saved status", e));
+  }, [signedIn, id]);
 
   async function toggleSave() {
-    if (!userId) return router.push(`/login?reason=save&callbackUrl=/recipes/${id}`);
+    if (!signedIn) return router.push(`/login?reason=save&callbackUrl=/recipes/${id}`);
     const was = saved;
     setSaved(!was);
     try {
-      if (was) await apiDelete(`/users/${userId}/saved-recipes/${id}`);
-      else await apiPost(`/users/${userId}/saved-recipes`, { recipe_id: Number(id) });
+      if (was) await unsaveRecipe(Number(id));
+      else await saveRecipe(Number(id));
       setToast(was ? "Removed from saved" : "Saved");
     } catch {
       setSaved(was);

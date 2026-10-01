@@ -1,4 +1,6 @@
 import uuid
+from typing import Literal
+
 import bcrypt
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,7 +24,9 @@ class SignupRequest(BaseModel):
 class OAuthRequest(BaseModel):
     email: str
     name: str | None
-    auth_provider: str
+    # Only real OAuth providers. Accepting any string let a caller pass
+    # "credentials" and get back a password user's user_id without the password.
+    auth_provider: Literal["google", "github"]
 
 
 @router.post("/api/auth/login")

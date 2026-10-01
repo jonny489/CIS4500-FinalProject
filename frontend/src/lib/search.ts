@@ -68,12 +68,5 @@ export function apiFilterUrl(s: SearchState): string {
   return url.toString();
 }
 
-/**
- * GET /users/:id/saved-recipes returns 20 rows unless told otherwise (100 is
- * its max). Both the Saved page and the stars on result cards need the whole
- * list, so always ask for the max.
- */
-export const SAVED_RECIPES_PARAMS = { limit: "100" };
-
 export const money =(n?: number | null) => (n == null ? "—" : `$${n.toFixed(2)}`);
 export const sourceOf = (link: string) => link.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];

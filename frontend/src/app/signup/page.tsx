@@ -4,7 +4,6 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AltLink, AuthError, AuthShell, Field, primaryBtn } from "@/components/auth";
-import { API_BASE_URL } from "@/lib/search";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,7 +19,8 @@ export default function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/signup`, {
+      // Same-origin route: the backend's /auth routes only accept the Next.js server.
+      const res = await fetch("/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, name }),

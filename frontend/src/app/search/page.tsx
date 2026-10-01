@@ -3,9 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { apiDelete, apiFetch, apiPost } from "@/lib/api";
 import { ErrorPanel, Pager, RecipeCard, SkeletonGrid, TagInput, Toast } from "@/components/ui";
-import { apiFilterUrl, parseSearch, SAVED_RECIPES_PARAMS, toQuery, type RecipeSummary, type SearchState } from "@/lib/search";
+import { listSavedRecipes, saveRecipe, unsaveRecipe } from "@/lib/saved-recipes";
+import { apiFilterUrl, parseSearch, toQuery, type RecipeSummary, type SearchState } from "@/lib/search";
 import { useFetch } from "@/lib/use-fetch";
 
 interface FilterResponse {
@@ -25,8 +25,8 @@ function Search() {
   const router = useRouter();
   const params = useSearchParams();
   const s = parseSearch(params);
-  const { data: session } = useSession();
-  const userId = session?.user?.id;
+  const { status } = useSession();
+  const signedIn = status === "authenticated";
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [saved, setSaved] = useState<Set<number>>(new Set());
@@ -50,12 +50,12 @@ function Search() {
   }
 
   useEffect(() => {
-    if (!userId) return;
-    apiFetch<{ saved_recipes: { recipe_id: number }[] }>(`/users/${userId}/saved-recipes`, SAVED_RECIPES_PARAMS)
-      .then((d) => setSaved(new Set(d.saved_recipes.map((r) => r.recipe_id))))
+    if (!signedIn) return;
+    listSavedRecipes()
+      .then((list) => setSaved(new Set(list.map((r) => r.recipe_id))))
       // Non-fatal: results still render, stars just show as unsaved. Log it so it isn't silent.
       .catch((e) => console.error("Failed to load saved recipes", e));
-  }, [userId]);
+  }, [signedIn]);
 
   function flash(t: string) {
     setToast(t);
@@ -63,12 +63,12 @@ function Search() {
   }
 
   async function toggleSave(id: number) {
-    if (!userId) return router.push(`/login?reason=save&callbackUrl=${encodeURIComponent(`/search?${params}`)}`);
+    if (!signedIn) return router.push(`/login?reason=save&callbackUrl=${encodeURIComponent(`/search?${params}`)}`);
     const was = saved.has(id);
     setSaved((p) => { const n = new Set(p); if (was) n.delete(id); else n.add(id); return n; });
     try {
-      if (was) await apiDelete(`/users/${userId}/saved-recipes/${id}`);
-      else await apiPost(`/users/${userId}/saved-recipes`, { recipe_id: id });
+      if (was) await unsaveRecipe(id);
+      else await saveRecipe(id);
       flash(was ? "Removed from saved" : "Saved");
     } catch {
       setSaved((p) => { const n = new Set(p); if (was) n.add(id); else n.delete(id); return n; });
