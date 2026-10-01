@@ -1,26 +1,37 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-paper: #f3f2ee;
+  --color-ink: #14201a;
+  --color-forest: #1d3a2c;
+  --color-forest-2: #2f4a3b;
+  --color-forest-3: #24382d;
+  --color-moss: #4c6a59;
+  --color-lime: #c8e66a;
+  --color-lime-hi: #dbf28a;
+  --color-lime-soft: #e9f3c9;
+  --color-leaf: #8fb33a;
+  --color-muted: #4d5a52;
+  --color-faint: #7d877f;
+  --color-line: #d4d6cf;
+  --color-well: #eceee7;
+  --color-sage: #c9d3cc;
+  --color-danger: #a5442a;
+  --color-danger-soft: #f7e4dd;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-bricolage), system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-paper text-ink font-sans antialiased;
+}
+
+input::placeholder {
+  @apply text-faint;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-lime);
+  outline-offset: 1px;
 }

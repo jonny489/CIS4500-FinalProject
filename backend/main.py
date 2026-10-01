@@ -1,6 +1,7 @@
 import os
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from security import require_internal_secret
 from routes.recipes_by_name import router as recipes_by_name_router
 from routes.ingredients_for_recipe import router as ingredients_for_recipe_router
 from routes.recipe_details import router as recipe_details_router
@@ -45,6 +46,8 @@ app.include_router(walmart_search_router)
 app.include_router(recipes_by_budget_router)
 app.include_router(recipe_estimated_cost_router)
 app.include_router(recipe_ingredient_matches_router)
-app.include_router(user_saved_recipes_router)
-app.include_router(auth_router)
+# These routes trust the user_id/email they are given, so only the Next.js
+# server (which verifies the session first) may call them. See security.py.
+app.include_router(user_saved_recipes_router, dependencies=[Depends(require_internal_secret)])
+app.include_router(auth_router, dependencies=[Depends(require_internal_secret)])
 app.include_router(recipes_filter_router)

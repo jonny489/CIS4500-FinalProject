@@ -1,243 +1,187 @@
 "use client";
 
-import { useEffect, useState, use, useRef, useCallback } from "react";
+import { Suspense, use, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { apiFetch, apiPost, apiDelete, formatRecipeLink } from "@/lib/api";
+import { apiFetch, formatRecipeLink, safeExternalUrl } from "@/lib/api";
+import { ErrorPanel, Toast } from "@/components/ui";
+import { isRecipeSaved, saveRecipe, unsaveRecipe } from "@/lib/saved-recipes";
+import { money, sourceOf } from "@/lib/search";
+import { useFetch } from "@/lib/use-fetch";
 
-interface CostEstimate {
-  estimated_total: number;
-  currency: string;
-  missing_prices: number;
+interface Recipe { recipe_id: number; name: string; link: string; directions: string }
+// quantity/units are nullable in needed_for ("salt to taste" has neither).
+interface Ingredient { ingredient_id: number; ingredient_description: string; quantity: number | null; units: string | null; ner_label: string }
+interface Match { ingredient_id: number; walmart_name: string | null; price: number | null; walmart_link: string | null }
+interface Cost { estimated_total: number; currency: string; missing_prices: number }
+
+interface RecipeBundle { recipe: Recipe; ingredients: Ingredient[]; cost: Cost; matches: Map<number, Match> }
+
+/** Everything the detail page shows, fetched in parallel. */
+async function fetchRecipeBundle(id: string): Promise<RecipeBundle> {
+  const [recipe, ing, cost, m] = await Promise.all([
+    apiFetch<Recipe>(`/recipes/${id}`),
+    apiFetch<{ ingredients: Ingredient[] }>(`/recipes/${id}/ingredients`),
+    apiFetch<Cost>(`/recipes/${id}/estimated-cost`),
+    apiFetch<{ matches: Match[] }>(`/recipes/${id}/ingredient-matches`),
+  ]);
+  return { recipe, ingredients: ing.ingredients, cost, matches: new Map(m.matches.map((x) => [x.ingredient_id, x])) };
 }
 
-interface IngredientMatch {
-  ingredient_id: number;
-  walmart_name: string | null;
-  price: number | null;
-  walmart_link: string | null;
-}
-import Link from "next/link";
-
-const SAVE_DEBOUNCE_MS = 1000;
-
-interface Recipe {
-  recipe_id: number;
-  name: string;
-  link: string;
-  directions: string;
-}
-
-interface Ingredient {
-  ingredient_id: number;
-  ingredient_description: string;
-  quantity: number;
-  units: string;
-  ner_label: string;
-}
-
-export default function RecipeDetailsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function RecipeDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: session } = useSession();
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // useSearchParams needs a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={<DetailSkeleton />}>
+      <RecipeDetails id={id} />
+    </Suspense>
+  );
+}
+
+function RecipeDetails({ id }: { id: string }) {
+  const router = useRouter();
+  const { status } = useSession();
+  const signedIn = status === "authenticated";
+  // Ingredients the user said they have, carried from the result card via ?have=…
+  // Lowercased to match the backend, which compares LOWER(ner_label).
+  const have = useSearchParams().getAll("have").map((h) => h.toLowerCase());
+
   const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const lastSaveTime = useRef<number>(0);
-  const [cost, setCost] = useState<CostEstimate | null>(null);
-  const [matchMap, setMatchMap] = useState<Map<number, IngredientMatch>>(new Map());
+  const [toast, setToast] = useState<string | null>(null);
+
+  const fetchBundle = useCallback(() => fetchRecipeBundle(id), [id]);
+  const { data, error, loading, reload } = useFetch(fetchBundle);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [recipeData, ingredientData, costData, matchData] = await Promise.all([
-          apiFetch<Recipe>(`/recipes/${id}`),
-          apiFetch<{ ingredients: Ingredient[] }>(`/recipes/${id}/ingredients`),
-          apiFetch<CostEstimate>(`/recipes/${id}/estimated-cost`),
-          apiFetch<{ matches: (IngredientMatch & { ingredient_id: number })[] }>(`/recipes/${id}/ingredient-matches`),
-        ]);
-        setRecipe(recipeData);
-        setIngredients(ingredientData.ingredients);
-        setCost(costData);
-        const map = new Map<number, IngredientMatch>();
-        for (const m of matchData.matches) map.set(m.ingredient_id, m);
-        setMatchMap(map);
+    if (!signedIn) return;
+    isRecipeSaved(Number(id))
+      .then(setSaved)
+      // Non-fatal: the button just starts as "Save". Log it so it isn't silent.
+      .catch((e) => console.error("Failed to check saved status", e));
+  }, [signedIn, id]);
 
-        if (session?.user?.id) {
-          try {
-            await apiFetch(`/users/${session.user.id}/saved-recipes/${id}`);
-            setSaved(true);
-          } catch {
-            setSaved(false);
-          }
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [id, session?.user?.id]);
-
-  const handleToggleSave = useCallback(async () => {
-    if (!session?.user?.id) return;
-    
-    const now = Date.now();
-    if (now - lastSaveTime.current < SAVE_DEBOUNCE_MS) {
-      return;
-    }
-    lastSaveTime.current = now;
-    
-    setSaving(true);
+  async function toggleSave() {
+    if (!signedIn) return router.push(`/login?reason=save&callbackUrl=/recipes/${id}`);
+    const was = saved;
+    setSaved(!was);
     try {
-      if (saved) {
-        await apiDelete(`/users/${session.user.id}/saved-recipes/${id}`);
-        setSaved(false);
-      } else {
-        await apiPost(`/users/${session.user.id}/saved-recipes`, {
-          recipe_id: parseInt(id),
-        });
-        setSaved(true);
-      }
-    } catch (err) {
-      console.error("Failed to toggle save:", err);
-    } finally {
-      setSaving(false);
+      if (was) await unsaveRecipe(Number(id));
+      else await saveRecipe(Number(id));
+      setToast(was ? "Removed from saved" : "Saved");
+    } catch {
+      setSaved(was);
+      setToast("Couldn't update saved recipes");
     }
-  }, [session?.user?.id, saved, id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-500">Loading recipe...</p>
-      </div>
-    );
+    setTimeout(() => setToast(null), 1800);
   }
 
-  if (error || !recipe) {
+  if (loading) return <DetailSkeleton />;
+  if (error || !data)
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center gap-4">
-        <p className="text-red-500">{error ?? "Recipe not found"}</p>
-        <Link href="/" className="text-blue-500 hover:underline">
-          Back to search
-        </Link>
-      </div>
+      <main className="p-8 flex flex-col gap-5">
+        <button onClick={() => router.back()} className="self-start text-muted">← Back</button>
+        <ErrorPanel title="Couldn't load this recipe." message={error ?? "Recipe not found"} onRetry={reload} />
+      </main>
     );
-  }
+
+  const { recipe, ingredients, cost, matches } = data;
+  const steps = recipe.directions.split("\n").map((t) => t.trim()).filter(Boolean);
+  const owns = (g: Ingredient) => have.includes(g.ner_label.toLowerCase());
+  const stillToBuy = ingredients.reduce((sum, g) => {
+    const p = matches.get(g.ingredient_id)?.price;
+    return owns(g) || p == null ? sum : sum + p;
+  }, 0);
+  const haveSome = ingredients.some(owns);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <div className="flex gap-4 mb-6">
-          <Link
-            href="/"
-            className="text-blue-500 hover:underline text-sm"
-          >
-            &larr; Back to search
-          </Link>
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-              {recipe.name}
-            </h1>
-            <a
-              href={formatRecipeLink(recipe.link)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:underline text-sm"
-            >
-              View original source
-            </a>
+    <main className="flex-1">
+      <div className="bg-forest text-paper px-8 pt-8 pb-12">
+        <button onClick={() => router.back()} className="text-[15px] text-sage px-3 py-1.5 -ml-3 rounded-full hover:bg-forest-3">← Back</button>
+        <div className="flex justify-between items-end gap-8 mt-8 flex-wrap">
+          <div className="flex flex-col gap-4 max-w-[820px]">
+            <h1 className="text-[84px] font-extrabold leading-[0.92] tracking-[-0.04em] text-balance">{recipe.name}</h1>
+            <div className="flex gap-5 text-sage">
+              <span>{ingredients.length} ingredients</span>
+              <a href={formatRecipeLink(recipe.link)} target="_blank" rel="noopener noreferrer" className="text-lime">{sourceOf(recipe.link)} ↗</a>
+            </div>
+          </div>
+          <div className="flex gap-3 items-center">
             {cost && cost.estimated_total > 0 && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                  Estimated cost: ${cost.estimated_total.toFixed(2)} {cost.currency}
-                </span>
-                {cost.missing_prices > 0 && (
-                  <span className="text-xs text-zinc-400">
-                    ({cost.missing_prices} ingredient{cost.missing_prices !== 1 ? "s" : ""} without price data)
-                  </span>
-                )}
+              <div className="bg-lime text-ink rounded-[20px] px-5.5 py-3.5 flex flex-col">
+                <span className="text-[13px] font-semibold">Est. total</span>
+                <span className="font-mono text-3xl">{money(cost.estimated_total)}</span>
               </div>
             )}
-          </div>
-          {session?.user && (
-            <button
-              onClick={handleToggleSave}
-              disabled={saving}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                saved
-                  ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              } disabled:opacity-50`}
-            >
-              {saving ? "..." : saved ? "Unsave" : "Save Recipe"}
+            <button onClick={toggleSave} className={`rounded-[20px] px-6 py-6.5 font-bold ${saved ? "bg-paper text-ink" : "border-[1.5px] border-moss hover:border-paper"}`}>
+              {saved ? "★ Saved" : "☆ Save"}
             </button>
-          )}
+          </div>
         </div>
+      </div>
 
-        <section className="mt-8">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-            Ingredients ({ingredients.length})
-          </h2>
-          {ingredients.length > 0 ? (
-            <ul className="space-y-2">
-              {ingredients.map((ing) => {
-                const match = matchMap.get(ing.ingredient_id);
-                return (
-                  <li
-                    key={ing.ingredient_id}
-                    className="flex justify-between items-center p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800"
-                  >
-                    <span className="text-zinc-900 dark:text-zinc-50">
-                      {ing.ingredient_description}
-                      <span className="ml-2 text-sm text-zinc-500">
-                        {ing.quantity} {ing.units}
-                      </span>
-                    </span>
-                    {match?.walmart_name && match.price != null ? (
-                      <a
-                        href={match.walmart_link ?? undefined}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0 ml-4 flex items-center gap-2 hover:underline"
-                      >
-                        <span className="text-xs text-zinc-400 max-w-[160px] truncate">
-                          {match.walmart_name}
-                        </span>
-                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                          ${match.price.toFixed(2)}
-                        </span>
-                      </a>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-zinc-500">No ingredients listed.</p>
+      <div className="px-8 pt-10 pb-24 grid grid-cols-[5fr_7fr] gap-10 items-start">
+        <section className="flex flex-col gap-4">
+          <h2 className="text-[28px] font-extrabold tracking-tight">Ingredients</h2>
+          <ul className="bg-white rounded-[20px] p-2">
+            {ingredients.map((g) => {
+              const m = matches.get(g.ingredient_id);
+              const owned = owns(g);
+              const amount = [g.quantity, g.units].filter((x) => x != null && x !== "").join(" ");
+              const walmartHref = safeExternalUrl(m?.walmart_link);
+              return (
+                <li key={g.ingredient_id} className="grid grid-cols-[28px_1fr_auto] gap-3 items-center p-3 rounded-xl">
+                  {owned ? <span className="size-6 rounded-full bg-lime grid place-items-center text-[13px] font-extrabold">✓</span> : <span className="size-5 rounded-full border-2 border-line" />}
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-[17px]">{amount && <b className="font-semibold">{amount} </b>}{g.ingredient_description}</span>
+                    <span className="text-[13px] text-faint truncate">{m?.walmart_name ?? "No price match"}</span>
+                  </div>
+                  {walmartHref ? (
+                    <a href={walmartHref} target="_blank" rel="noopener noreferrer" className="font-mono text-sm hover:underline">{money(m?.price)}</a>
+                  ) : (
+                    <span className="font-mono text-sm">{money(m?.price)}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {cost && (
+            <div className="bg-ink text-paper rounded-[20px] px-6 py-5 flex flex-col gap-2">
+              <div className="flex justify-between"><span>Full shop</span><span className="font-mono">{money(cost.estimated_total)}</span></div>
+              {haveSome && <div className="flex justify-between text-lg font-bold text-lime"><span>With what you have</span><span className="font-mono">{money(stillToBuy)}</span></div>}
+              {cost.missing_prices > 0 && <span className="text-[13px] text-sage">{cost.missing_prices} ingredient{cost.missing_prices > 1 ? "s" : ""} without price data</span>}
+            </div>
           )}
         </section>
 
-        <section className="mt-8">
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-            Directions
-          </h2>
-          <div className="p-4 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-            <p className="text-zinc-700 dark:text-zinc-300 whitespace-pre-line">
-              {recipe.directions}
-            </p>
-          </div>
+        <section className="flex flex-col gap-4">
+          <h2 className="text-[28px] font-extrabold tracking-tight">Directions</h2>
+          <ol>
+            {steps.map((t, i) => (
+              <li key={i} className="grid grid-cols-[56px_1fr] gap-4 py-5 border-t-[1.5px] border-[#dcdcd5]">
+                <span className="text-[40px] font-extrabold leading-none tracking-[-0.04em] text-leaf">{i + 1}</span>
+                <span className="text-[19px] leading-relaxed text-pretty">{t}</span>
+              </li>
+            ))}
+          </ol>
         </section>
       </div>
-    </div>
+      <Toast text={toast} />
+    </main>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <main aria-busy="true" className="flex-1 animate-pulse">
+      <div className="bg-forest px-8 pt-8 pb-12 flex flex-col gap-5">
+        <div className="h-4.5 w-20 bg-forest-2 rounded-md" />
+        <div className="h-19 w-3/5 bg-forest-2 rounded-xl mt-5" />
+        <div className="h-4 w-56 bg-forest-2 rounded-md" />
+      </div>
+      <div className="px-8 py-10 grid grid-cols-[5fr_7fr] gap-10">
+        <div className="bg-white rounded-[20px] h-105" />
+        <div className="flex flex-col gap-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-16 bg-well rounded-xl" />)}</div>
+      </div>
+    </main>
   );
 }
